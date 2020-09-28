@@ -4,6 +4,7 @@ from random import choices
 
 from .models import Animal, Bull, Cow, Genotype, Phenotype
 
+
 def get_genotype_indexies(r: List[float]) -> List[int]:
     """
     Get indexies for choising haplotype in genotype
@@ -28,7 +29,9 @@ def get_gamete(genotype: List[List[int]], indexies: List[int]) -> List[int]:
         genotype[i][indexies[i]] for i in range(len(genotype[0]))
     ]
 
-def get_reproduce(genotypes: List[List[List[int]]], possibilities: List[float], population_of_progeny: int) -> List[List[List[int]]]:
+
+def get_reproduce(genotypes: List[List[List[int]]], possibilities: List[float], population_of_progeny: int) -> List[
+    List[List[int]]]:
     """
     Return children(which is amount=population_of_progeny)' genotype from parents' genotypes
     """
@@ -39,28 +42,62 @@ def get_reproduce(genotypes: List[List[List[int]]], possibilities: List[float], 
                 haplotypes[i][j][k] = get_gamete(genotypes[j], get_genotype_indexies(possibilities))
     return haplotypes
 
-def gebv_select(reproduce: List[List[List[int]]], possibilities: List[float]):
+
+
+def gebv_select(reproduce: List[List[List[int]]],
+                possibilities: List[int],
+                n: int) -> int:
+
+    return np.sum(possibilities * np.array(reproduce[n])[:, 1]) + \
+            np.sum(possibilities * np.array(reproduce[n])[:, 0])
+
+
+def ohv_select(reproduce: List[List[List[int]]],
+               possibilities: List[int],
+               n: int) -> int:
+
+    return np.sum(2 * np.maximum(possibilities * np.array(reproduce[n])[:, 1],
+                             possibilities * np.array(reproduce[n])[:, 0]))
+
+
+def opv_select():
     return
+
 
 def pcv_select():
+    return 
+
+def gb_select():
     return
 
-def ohv_select():
-    return
 
-def wgebv_select():
-    return
+def wgebv_select(
+        reproduce: List[List[List[int]]],
+        weight_list: List[int],
+        possibilities: List[int], n: int, ) -> int:
+
+    weighted_possib = possibilities / \
+                      (np.sqrt(np.maximum(np.array([1 / len(reproduce)] *
+                    len(reproduce[n])[:, 0]), weight_list)))
+
+
+    return (np.sum(weighted_possib * np.array(reproduce[n])[:, 1]) +
+           np.sum(weighted_possib * np.array(reproduce[n])[:, 0]))
+
 
 def ie312_select():
     return
 
+
 def ie534_select():
     return
+
 
 def ie634_select():
     return
 
-def select(reproduce: List[List[List[int]]], possibilities: List[float], strategy: str='gebv') -> (int, int):
+
+def select(reproduce: List[List[List[int]]], possibilities: List[float], strategy: str = 'gebv') -> (int, int):
     """
 
     Parameters
@@ -73,4 +110,3 @@ def select(reproduce: List[List[List[int]]], possibilities: List[float], strateg
     """
     if strategy == 'gebv':
         return gebv_select(reproduce, possibilities)
-
