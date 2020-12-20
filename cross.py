@@ -1,5 +1,6 @@
 from typing import Union, List, Iterable, Dict, Callable, Any
 import numpy as np
+from nptyping import NDArray
 from random import choices
 from dataclasses import dataclass, fields
 
@@ -50,7 +51,10 @@ class DefaultValuesMixin:
 
 @dataclass
 class Genotype:
-    matrix: np.ndarray
+    matrix: NDArray
+
+    def __getitem__(self, item):
+        return self.matrix.__getitem__(item)
 
 
 @dataclass
@@ -77,11 +81,19 @@ class FeatureHelper:
     @classmethod
     def get_feature(cls, approach="gebv"):
         if approach == "gebv":
-            return getattr(cls, "_gebv_feature")
+            return getattr(cls, "gebv_feature")
 
     @classmethod
-    def _gebv_feature(cls, genotype: Genotype) -> int:
-        return np.sum(genotype.matrix[0, :] + genotype.matrix[1, :])
+    def gebv_feature(cls, genotype: Genotype):
+        return np.sum(genotype.matrix)
+
+    @classmethod
+    def ohv_feature(cls, genotype: Genotype):
+        return np.sum(2*np.maximum(genotype.matrix[0], genotype.matrix[1]))
+
+    @classmethod
+    def pcv_feature(cls, genotype1: Genotype, genotype2: Genotype) -> int:
+        return 0
 
     @classmethod
     def calculate_features_for_generations(cls, generations: List[Generation], approach: str = None,
@@ -97,9 +109,9 @@ class FeatureHelper:
             cls, generations: List[Generation], generation_number: int = 0,
             approach: str = None, feature_function: Callable[[Genotype], Feature] = None) -> List[Feature]:
         _feature_function = cls.__get_valid_feature_function(approach, feature_function)
-        filter_generation_by_index(generations, generation_number)
+        generation = filter_generation_by_index(generations, generation_number)
 
-        return cls._calculate_feature_for_generation(generation_list[0], _feature_function)
+        return cls._calculate_feature_for_generation(generation, _feature_function)
 
     @classmethod
     def _calculate_feature_for_generation(cls, generation: Generation, feature_function: Callable[[Genotype], Feature]
@@ -162,66 +174,137 @@ class GraphHelper:
         return
 
 
-class Breed:
-    # TODO: Convert all vars to dataclasses
-    def __init__(self, parent_genotypes: np.ndarray, possibilites: List[float], population_of_progeny: int,
-                 maximum_feature=None):
-        if len(parent_genotypes.shape) != 3 or parent_genotypes.shape[:2] != (2, 2) or parent_genotypes.shape[2] <= 0:
-            raise AttributeError("Массив генотипов особей задан неверно! Размерность должна быть (2 x 2 x N)")
+class Selection:
+    def __init__(self, generation: Generation, selection: str = "gebv", possibilites: List[int] = None):
+        if selection == "pcv" and not possibilites:
+            raise AttributeError("Не передан список вероятностей")
+        self.generation = generation
+        self.selection = selection
+        self.freq = possibilites
 
-        # self.generations = {0: parent_genotypes}
+    def select(self) -> Iterable[Genotype]:
+        return getattr(self, f"_{self.selection}_selection")(self.generation)
+
+    def _gebv_selection(self) -> Iterable[Genotype]:
+        sorted_features = sorted(
+            enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
+            key=lambda value: value[1],
+        )
+        index_parent1, index_parent2 = sorted_features[-1][0], sorted_features[-2][0]
+        return self.generation.genotypes[index_parent1], self.generation.genotypes[index_parent2]
+
+    def _ohv_selection(self) -> Iterable[Genotype]:
+        sorted_features = sorted(
+            enumerate([FeatureHelper.ohv_feature(genotype) for genotype in self.generation.genotypes]),
+            key=lambda value: value[1],
+        )
+        index_parent1, index_parent2 = sorted_features[-1][0], sorted_features[-2][0]
+        return self.generation.genotypes[index_parent1], self.generation.genotypes[index_parent2]
+
+    def _pcv_selection(self) -> Iterable[Genotype]:
+        pcv_matrix = np.zeros((self.generation.population, self.generation.population))
+        for i in range(self.generation.population):
+            for j in range(i, self.generation.population):
+                water_matrix = self.__water_matrix(self.generation.genotypes[i], self.generation.genotypes[j])
+                pcv_matrix[i, j] = np.sum(water_matrix[:, :])
+
+        index_parent1, index_parent2 = np.unravel_index(pcv_matrix.argmax(), pcv_matrix.shape)
+        return self.generation.genotypes[index_parent1], self.generation.genotypes[index_parent2]
+
+    def __water_matrix(self, genotype1: Genotype, genotype2: Genotype):
+        n = self.generation.genotypes[0].matrix.shape[0]
+        matrix = np.zeros((n, 4))
+        parents = np.concatenate((
+            genotype1[:, 0],
+            genotype1[:, 1],
+            genotype2[:, 0],
+            genotype2[:, 1]
+        ))
+
+        matrix[0, :] = 0.25 * parents[0, :]
+        for i in range(1, matrix.shape[0]):
+            t = self.__transition_matrix(i - 1)
+            for j in range(matrix.shape[1]):
+                matrix[i, j] = parents[i, j] * np.sum([t[k, j, i - 1]*matrix[i - 1, k] for k in range(4)])
+
+        return matrix
+
+    def __transition_matrix(self, i: int):
+        """
+        i - index of possibilities
+        """
+        return np.array([
+            [(1 - self.freq[i])**2, self.freq[i]*(1 - self.freq[i]), 0.5*self.freq[i], 0.5*self.freq[i]],
+            [self.freq[i]*(1 - self.freq[i]), (1 - self.freq[i])**2, 0.5*self.freq[i], 0.5*self.freq[i]],
+            [0.5*self.freq[i], 0.5*self.freq[i], (1 - self.freq[i])**2, self.freq[i]*(1 - self.freq[i])],
+            [0.5*self.freq[i], 0.5*self.freq[i], (1 - self.freq[i])**2, self.freq[i]*(1 - self.freq[i])]
+        ])
+
+    @classmethod
+    def selection_implemented(cls, selection: str):
+        return True if f"_{selection}_selection" in dir(cls) else False
+
+
+class Breed:
+    def __init__(self, parent_genotypes: np.ndarray, possibilites: List[float], population_of_progeny: int,
+                 maximum_feature=None, selection: str = "gebv"):
+        if len(parent_genotypes.shape) != 3 or parent_genotypes.shape[0:] != (2, 2) or parent_genotypes.shape[0] <= 0:
+            raise AttributeError("Массив генотипов особей задан неверно! Размерность должна быть (2 x 2 x N)")
+        if not Selection.selection_implemented(selection):
+            raise NotImplementedError(f"Селекция {selection} не реализована!")
+
         self.generations: List[Generation] = [Generation(
             index=0,
             genotypes=list(Genotype(genotype) for genotype in parent_genotypes),
-            population=parent_genotypes.shape[0]
+            population=parent_genotypes.shape[2]
         )]
         self.possibilities = possibilites
         self.population_of_progeny = population_of_progeny
         self._current_generation = 0
-        self.maximum_feature = (self.generations[0].genotypes[0].matrix.shape[2] * 2
+        self.maximum_feature = (self.generations[0].genotypes[0].matrix.shape[0] * 2
                                 if maximum_feature is None
                                 else maximum_feature)
+        self.selection = selection
 
-    def evaluate(self, selection: str = "gebv", max_generations: int = None):
-        if not getattr(self, f"_{selection}_selection", None):
-            raise NotImplementedError(f"Селекция {selection} не реализована!")
-
+    def evaluate(self, max_generations: int = None):
         current_generation_number = 0
         while True:
-            if self._is_max_feature_genotype(current_generation_number):
+            if self._is_max_generation(current_generation_number):
                 return current_generation_number
-            selected_parents = getattr(FeatureHelper, f"_{selection}_selection")(current_generation_number)
-            parents_genotypes = self.generations[current_generation_number][selected_parents, :, :]
-            self.generations[current_generation_number + 1] = self.get_reproduce(parents_genotypes)
+
+            parents = self.get_generation(current_generation_number)
+            children = self.get_child_generation(parents)
+            self.generations.append(children)
+
             if max_generations and current_generation_number == max_generations:
                 return current_generation_number
             current_generation_number += 1
 
-    def _gebv_selection(self, current_generation_number) -> Iterable[int]:
-        reproduce = self.generations[current_generation_number]
-        population = reproduce.shape[0]
-        features = {FeatureHelper._gebv_feature(reproduce[i, :, :]): i for i in range(population)}
-        sorted_features = sorted(features)
-        return features[sorted_features[-1]], features[sorted_features[-2]]
+    def get_generation(self, generation_index: int) -> Generation:
+        return list(filter(lambda generation: generation.index == generation_index, self.generations))[0]
 
-    def get_reproduce(self, parent_genotypes: np.ndarray):
+    def get_child_generation(self, parent_generation: Generation):
+        parent1, parent2 = getattr(FeatureHelper, f"_{self.selection}_selection")(parent_generation)
+        children = self.get_reproduce(parent1, parent2)
+        return Generation(index=parent_generation.index + 1, genotypes=children, population=len(children))
+
+    def get_reproduce(self, parent1: Genotype, parent2: Genotype) -> List[Genotype]:
         """
         Return children(which is amount=population_of_progeny)' genotype from parents' genotypes
         """
-        haplotypes = np.zeros((self.population_of_progeny, 2, parent_genotypes.shape[2]))
-        number_of_parents = parent_genotypes.shape[0]
-        for k in range(self.population_of_progeny):
+        children = []
+        for _ in range(self.population_of_progeny):
             new_genotype = None
-            for j in range(number_of_parents):
+            for genotype in (parent1, parent2):
                 if new_genotype:
                     np.append(
-                        new_genotype, self.get_gamete(parent_genotypes[j], self.get_genotype_indexies()),
+                        new_genotype, self.get_gamete(genotype),
                         axis=0
                     )
                 else:
-                    new_genotype = self.get_gamete(parent_genotypes[j], self.get_genotype_indexies())
-            haplotypes[k, :, :] = new_genotype
-        return haplotypes
+                    new_genotype = self.get_gamete(genotype)
+            children.append(Genotype(matrix=new_genotype))
+        return children
 
     def get_genotype_indexies(self) -> List[int]:
         """
@@ -241,21 +324,25 @@ class Breed:
 
         return return_list
 
-    @staticmethod
-    def get_gamete(genotype: np.ndarray, indexies: List[int]) -> List[int]:
+    def get_gamete(self, genotype: Genotype) -> np.ndarray:
         """
         Return gamete from genotype input
         """
-        return [
-            genotype[indexies[i], i] for i in range(genotype.shape[1])
-        ]
+        indexies = self.get_genotype_indexies()
+        return np.array([
+            genotype[i, indexies[i]] for i in range(genotype.matrix.shape[0])
+        ])
 
-    def _is_max_feature_genotype(self, current_generation_number: int):
-        generation = filter_generation_by_index(self.generations, current_generation_number)
+    def _is_max_generation(self, generation_index: int):
+        generation = self.get_generation(generation_index)
         for genotype in generation.genotypes:
-            if np.sum(genotype.matrix) >= self.maximum_feature:
+            if self._is_max_feature_genotype(genotype):
                 return True
         return False
+
+    def _is_max_feature_genotype(self, genotype: Genotype):
+        return True if np.sum(genotype.matrix) >= self.maximum_feature else False
+
 
 #
 # def gebv_select(reproduce: List[List[List[int]]], possibilities: List[int], n: int) -> int:
