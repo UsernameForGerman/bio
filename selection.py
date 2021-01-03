@@ -34,8 +34,6 @@ class Selection:
 
     def _pcv_selection(self) -> Iterable[Genotype]:
         pcv_matrix = np.zeros((self.generation.population, self.generation.population))
-        print(self.generation.population)
-        print(self.generation.genotypes.__len__())
         for i in range(self.generation.population):
             for j in range(i, self.generation.population):
                 water_matrix = self.__water_matrix(self.generation.genotypes[i], self.generation.genotypes[j])

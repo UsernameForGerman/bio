@@ -1,5 +1,6 @@
-from typing import Callable
+from typing import Callable, List
 
+import numpy as np
 import matplotlib.pyplot as plt
 
 from models import Generation, Genotype, Feature
@@ -36,6 +37,14 @@ class PlotHelper:
         plt.show()
 
         plt.close()
+
+    @classmethod
+    def desirable_alleles_percent(cls, generations: List[Generation]):
+        ys = [np.sum([genotype.matrix for genotype in generation.genotypes])/(np.prod(generation.genotypes[0].matrix.shape)*len(generation.genotypes)) for generation in generations]
+        xs = [generation.index for generation in generations]
+
+        plt.plot(xs, ys)
+        plt.show()
 
     @classmethod
     def pcv_map(cls):

@@ -41,19 +41,20 @@ def make_generation(parents: List):
 # )
 
 
-breed = Breed(parents, possibilites, population, selection="pcv")
-last_generation_index = breed.evaluate(3)
+breed = Breed(parents, possibilites, population, selection="pcv", max_age=3)
+last_generation_index = breed.evaluate(60)
 
-print(last_generation_index)
-print(len(breed.generations[last_generation_index].genotypes))
-print(breed.generations[last_generation_index])
+PlotHelper.desirable_alleles_percent(breed.generations)
+# print(last_generation_index)
+# print(len(breed.generations[last_generation_index].genotypes))
+# print(breed.generations[last_generation_index])
 
 # PlotHelper.feature_individual_for_generation(
 #     breed.generations[-1],
 #     FeatureHelper.ohv_feature
 # )
-PlotHelper.feature_individual_for_generation(
-    breed.generations[-1],
-    FeatureHelper.gebv_feature
-)
+# PlotHelper.feature_individual_for_generation(
+#     breed.generations[-1],
+#     FeatureHelper.gebv_feature
+# )
 

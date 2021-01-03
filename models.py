@@ -21,6 +21,7 @@ class DefaultValuesMixin:
 @dataclass
 class Genotype:
     matrix: NDArray
+    age: int = 0
 
     def __getitem__(self, item):
         return self.matrix.__getitem__(item)
