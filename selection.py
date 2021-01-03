@@ -51,6 +51,7 @@ class Selection:
             genotype2[0, :],
             genotype2[1, :]
         ])
+        matrix[0, :] = parents[:, 0] / 4
         for i in range(1, matrix.shape[0]):
             t = self.__transition_matrix(i - 1)
             for j in range(matrix.shape[1]):

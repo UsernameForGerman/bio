@@ -21,6 +21,7 @@ parent2 = [
 ]
 
 parents = np.array([parent1, parent2])
+# print(parents)
 print(f"Initialized parent genotypes wuth: {parents.shape} shape")
 
 possibilites = [0.2, 0.35, 0.3, 0.4, 0.25, 0.45, 0.35, 0.25, 0.2, 0.35]
