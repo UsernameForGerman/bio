@@ -1,11 +1,59 @@
-from dataclasses import dataclass
+from typing import List
+import numpy as np
+
+from breed import Breed
+from features import FeatureHelper
+from models import Genotype, Generation
+from plot import PlotHelper
 
 
-@dataclass
-class Test:
-    number: int
-    string: str
+
+# initial data
+
+parent1 = [
+    [0, 1, 0, 1, 0, 1, 0, 1, 0, 1],
+    [1, 0, 0, 1, 1, 0, 0, 1, 1, 0]
+]
+
+parent2 = [
+    [0, 1, 1, 0, 0, 1, 1, 0, 0, 1],
+    [0, 0, 0, 1, 0, 0, 0, 1, 0, 0]
+]
+
+parents = np.array([parent1, parent2])
+print(f"Initialized parent genotypes wuth: {parents.shape} shape")
+
+possibilites = [0.2, 0.35, 0.3, 0.4, 0.25, 0.45, 0.35, 0.25, 0.2, 0.35]
+
+population = 3
 
 
-print(Test(1, "1"))
-print(list(filter(lambda test: test.number == 2, [Test(1, "1"), Test(2, "2"), Test(3, "3")])))
+def make_generation(parents: List):
+    return Generation(
+        index=0,
+        genotypes=[Genotype(np.array(parent)) for parent in parents]
+    )
+
+
+# PlotHelper.feature_individual_for_generation(
+#     make_generation([parent1, parent2]),
+#     FeatureHelper.gebv_feature
+# )
+
+
+breed = Breed(parents, possibilites, population, selection="pcv")
+last_generation_index = breed.evaluate(3)
+
+print(last_generation_index)
+print(len(breed.generations[last_generation_index].genotypes))
+print(breed.generations[last_generation_index])
+
+# PlotHelper.feature_individual_for_generation(
+#     breed.generations[-1],
+#     FeatureHelper.ohv_feature
+# )
+PlotHelper.feature_individual_for_generation(
+    breed.generations[-1],
+    FeatureHelper.gebv_feature
+)
+
