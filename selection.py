@@ -1,5 +1,6 @@
 from typing import List, Iterable
 import numpy as np
+import math
 
 from models import Generation, Genotype
 from features import FeatureHelper
@@ -15,13 +16,33 @@ class Selection:
 
     def select(self) -> Iterable[Genotype]:
         return getattr(self, f"_{self.selection}_selection")(self.generation)
+    
+    def _ie534_selection(self, crosses: int = 1) -> Iterable[Genotype]:
+        sorted_features = sorted(
+            enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
+            key=lambda value: value[1],
+            reverse=True
+        )
+        parents = np.array(self.generation.genotypes)
+        best_part_parents = parents[[value[0] for value in sorted_features[:math.ceil(len(sorted_features) * 0.05)]]]
+        len_best_part_parents = len(best_part_parents)
+        parent_matrix = np.zeros((len_best_part_parents, len_best_part_parents))
+        for i in range(len_best_part_parents):
+            for j in range(len_best_part_parents):
+                parent_matrix[i, j] = np.sum(
+                    np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
+                )
+
+        index_parent1, index_parent2 = np.unravel_index(parent_matrix.argmax(), parent_matrix.shape)
+        return self.generation.genotypes[index_parent1], self.generation.genotypes[index_parent2]
 
     def _gebv_selection(self) -> Iterable[Genotype]:
         sorted_features = sorted(
             enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
+            reverse=True
         )
-        index_parent1, index_parent2 = sorted_features[-1][0], sorted_features[-2][0]
+        index_parent1, index_parent2 = sorted_features[0][0], sorted_features[1][0]
         return self.generation.genotypes[index_parent1], self.generation.genotypes[index_parent2]
 
     def _ohv_selection(self) -> Iterable[Genotype]:

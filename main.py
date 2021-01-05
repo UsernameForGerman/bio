@@ -24,7 +24,7 @@ parents = np.array([parent1, parent2])
 # print(parents)
 print(f"Initialized parent genotypes wuth: {parents.shape} shape")
 
-possibilites = [0.2, 0.35, 0.3, 0.4, 0.25, 0.45, 0.35, 0.25, 0.2, 0.35]
+possibilites = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 
 population = 3
 
@@ -42,8 +42,8 @@ def make_generation(parents: List):
 # )
 
 
-breed = Breed(parents, possibilites, population, selection="pcv", max_age=3)
-last_generation_index = breed.evaluate(60)
+breed = Breed(parents, possibilites, population, selection="gebv", max_age=1)
+last_generation_index = breed.evaluate(10)
 
 PlotHelper.desirable_alleles_percent(breed.generations)
 # print(last_generation_index)
