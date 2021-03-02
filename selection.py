@@ -7,12 +7,13 @@ from features import FeatureHelper
 
 
 class Selection:
-    def __init__(self, generation: Generation, selection: str = "gebv", possibilites: List[float] = None):
+    def __init__(self, generation: Generation, selection: str = "gebv", possibilites: List[float] = None, max_number: int = sys.maxsize):
         if selection == "pcv" and not possibilites:
             raise AttributeError("Не передан список вероятностей")
         self.generation = generation
         self.selection = selection
         self.freq = possibilites
+        self.max_number = max_number
 
     def select(self) -> Iterable[Genotype]:
         return getattr(self, f"_{self.selection}_selection")(self.generation)
@@ -38,12 +39,14 @@ class Selection:
 
     def _gebv_selection(self) -> Iterable[Genotype]:
         sorted_features = sorted(
-            enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
+            enumerate([FeatureHelper.gebv_feature(genotype, self.freq) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
             reverse=True
         )
-        index_parent1, index_parent2 = sorted_features[0][0], sorted_features[1][0]
-        return self.generation.genotypes[index_parent1], self.generation.genotypes[index_parent2]
+        indexes = list()
+        for i in range(0, self.max_number - 1, 2):
+            indexes.append((sorted_features[i][0], sorted_features[i+1][0]))
+        return [(self.generation.genotypes[i[0]], self.generation.genotypes[i[1]]) for i in indexes]
 
     def _ohv_selection(self) -> Iterable[Genotype]:
         sorted_features = sorted(
