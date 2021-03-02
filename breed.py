@@ -8,7 +8,7 @@ from selection import Selection
 
 class Breed:
     def __init__(self, parent_genotypes: np.ndarray, possibilites: List[float], population_of_progeny: int,
-                 maximum_feature=None, selection: str = "gebv", max_age: int = 1):
+                 maximum_feature=None, selection: str = "gebv", max_age: int = 1, max_number: int = sys.maxsize):
         if len(parent_genotypes.shape) != 3 or parent_genotypes.shape[:2] != (2, 2) or any(_ <= 0 for _ in parent_genotypes.shape):
             raise AttributeError("Массив генотипов особей задан неверно! Размерность должна быть (2 x 2 x N)")
         if max_age <= 0:
@@ -29,6 +29,7 @@ class Breed:
                                 else maximum_feature)
         self.selection = selection
         self.max_age = max_age
+        self.max_number = max_number
 
     def evaluate(self, max_generations: int = None):
         current_generation_number = 0

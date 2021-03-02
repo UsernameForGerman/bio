@@ -42,7 +42,7 @@ def make_generation(parents: List):
 # )
 
 
-breed = Breed(parents, possibilites, population, selection="gebv", max_age=1)
+breed = Breed(parents, possibilites, population, selection="gebv", max_age=1, max_number=36)
 last_generation_index = breed.evaluate(10)
 
 PlotHelper.desirable_alleles_percent(breed.generations)
