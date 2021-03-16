@@ -12,7 +12,7 @@ class FeatureHelper:
             return getattr(cls, "gebv_feature")
 
     @classmethod
-    def gebv_feature(cls, genotype: Genotype, possibilities):
+    def gebv_feature(cls, genotype: Genotype, possibilities=None):
         return np.sum(genotype.matrix.dot(possibilities))
 
     @classmethod

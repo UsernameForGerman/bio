@@ -1,18 +1,21 @@
 from typing import List
 import numpy as np
 from random import choices
+import sys
 
 from models import Genotype, Generation
 from selection import Selection
+from reduction import HerdReduction
 
 
 class Breed:
     def __init__(self, parent_genotypes: np.ndarray, possibilites: List[float], population_of_progeny: int,
-                 maximum_feature=None, selection: str = "gebv", max_age: int = 1, max_number: int = sys.maxsize):
+                 maximum_feature=None, selection: str = "gebv", max_age: int = 1, max_population: int = sys.maxsize,
+                 possibilities_for_selection: List[float] = None, crosses: int = 1):
         if len(parent_genotypes.shape) != 3 or parent_genotypes.shape[:2] != (2, 2) or any(_ <= 0 for _ in parent_genotypes.shape):
             raise AttributeError("Массив генотипов особей задан неверно! Размерность должна быть (2 x 2 x N)")
         if max_age <= 0:
-            raise AttributeError("Максимальный возраст сущнсоти должен быть >= 1")
+            raise AttributeError("Максимальный возраст сущности должен быть >= 1")
         if not Selection.selection_implemented(selection):
             raise NotImplementedError(f"Селекция {selection} не реализована!")
 
@@ -29,7 +32,9 @@ class Breed:
                                 else maximum_feature)
         self.selection = selection
         self.max_age = max_age
-        self.max_number = max_number
+        self.max_population = max_population
+        self.possibilities_for_selection = possibilities_for_selection
+        self.crosses = crosses
 
     def evaluate(self, max_generations: int = None):
         current_generation_number = 0
@@ -44,6 +49,11 @@ class Breed:
                 parent.age += 1
             child_generation.genotypes.extend(young_parents_genotypes)
             child_generation.population = len(child_generation.genotypes)
+            if child_generation.population > self.max_population:
+                reduction = HerdReduction(child_generation, self.max_population,
+                                          possibilities=self.possibilities_for_selection)
+                child_generation = getattr(reduction, f"_{self.selection}_selection")()
+                child_generation.population = self.max_population
             self.generations.append(child_generation)
 
             if max_generations and current_generation_number == max_generations:
@@ -54,10 +64,13 @@ class Breed:
         return list(filter(lambda generation: generation.index == generation_index, self.generations))[0]
 
     def get_child_generation(self, parent_generation: Generation):
-        selection = Selection(parent_generation, possibilites=self.possibilities)
-        parent1, parent2 = getattr(selection, f"_{self.selection}_selection")()
-        children = self.get_reproduce(parent1, parent2)
-        return Generation(index=parent_generation.index + 1, genotypes=children, population=len(children))
+        selection = Selection(parent_generation, possibilities=self.possibilities_for_selection, crosses=self.crosses)
+        parents = getattr(selection, f"_{self.selection}_selection")()
+        childrens = []
+        for pair in parents:
+            childrens += self.get_reproduce(pair[0], pair[1])
+        #childrens = [self.get_reproduce(pair[0], pair[1]) for pair in parents]
+        return Generation(index=parent_generation.index + 1, genotypes=childrens, population=len(childrens))
 
     def filter_generation_for_max_age(self, generation: Generation) -> List[Genotype]:
         return list(filter(lambda genotype: genotype.age < self.max_age, generation.genotypes))
@@ -108,6 +121,9 @@ class Breed:
         ])
 
     def _is_max_generation(self, generation_index: int):
+        '''
+        return True if at least one of the genotypes in generation is more than maximum_feature
+        '''
         generation = self.get_generation(generation_index)
         for genotype in generation.genotypes:
             if self._is_max_feature_genotype(genotype):
@@ -116,3 +132,14 @@ class Breed:
 
     def _is_max_feature_genotype(self, genotype: Genotype):
         return True if np.sum(genotype.matrix) >= self.maximum_feature else False
+
+    def herd_reduction(self, generation: Generation) -> Generation:
+
+        pass
+
+    def _is_max_number(self):
+        number = 0
+        for g in self.generations:
+            number += g.population
+        if number > self.max_number:
+            self.herd_reduction()

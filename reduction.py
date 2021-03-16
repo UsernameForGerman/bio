@@ -1,28 +1,22 @@
 from typing import List, Iterable
-import numpy as np
 import math
-from sys import maxsize
-
-
-from models import Generation, Genotype
+import numpy as np
+from models import Generation, Genotype, Feature
 from features import FeatureHelper
+from selection import Selection
 
 
-class Selection:
-    def __init__(self, generation: Generation, selection: str = "gebv", possibilities: List[float] = None,
-                 max_number: int = maxsize, crosses: int = 1):
+class HerdReduction:
+    def __init__(self, generation: Generation, max_population, selection: str = "gebv",
+                 possibilities: List[float] = None):
         if selection == "pcv" and not possibilities:
             raise AttributeError("Не передан список вероятностей")
         self.generation = generation
         self.selection = selection
         self.freq = possibilities
-        self.max_number = max_number
-        self.crosses = crosses
+        self.max_population = max_population
 
-    def select(self) -> Iterable[Genotype]:
-        return getattr(self, f"_{self.selection}_selection")(self.generation)
-    
-    def _ie534_selection(self, crosses: int = 1) -> List[Iterable[Genotype]]:
+    def _ie534_reduction(self, crosses: int = 1) -> Generation:
         sorted_features = sorted(
             enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
@@ -39,53 +33,70 @@ class Selection:
                     np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
                 )  # the number of locus where at least the one in pair have a desirable allele
                 # * -  unpacking in arguments
-        t = self.generation.index + 1
-        K = 6 * (11 - t) # according to the model
-        indexes = np.zeros(K)
-        for i in range(K):
-            index_parent1, index_parent2 = np.unravel_index(parent_matrix.argmax(), parent_matrix.shape)
-            # i, j of the max
-            indexes[i] = (index_parent1, index_parent2)
-            parent_matrix[index_parent1][index_parent2] = -1
-        return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in indexes]
+        sorted_indexes = set()
+        parent_matrix1 = parent_matrix.copy()
+        while len(sorted_indexes) < self.max_population:
+            index_parent1, index_parent2 = np.unravel_index(parent_matrix1.argmax(), parent_matrix1.shape)
+            sorted_indexes.add(index_parent2)
+            sorted_indexes.add(index_parent1)
+            parent_matrix1[index_parent1][index_parent2] = -1
+        if len(sorted_indexes) > self.max_population:
+            sorted_indexes = np.array(sorted_indexes)
+            v534 = np.array(sum([parent_matrix[i][j] for j in sorted_indexes if i != j]) for i in sorted_indexes)
+            np.delete(sorted_indexes, np.argmin(v534))
+        return Generation(
+            index=self.generation.index,
+            genotypes=[self.generation.genotypes[i] for i in sorted_indexes],
+            population=self.max_population
+        )
 
-    def _gebv_selection(self) -> List[Iterable[Genotype]]:
+    def _gebv_reduction(self) -> Generation:
         sorted_features = sorted(
             enumerate([FeatureHelper.gebv_feature(genotype, self.freq) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
             reverse=True
         )
-        indexes = list()
-        for i in range(self.crosses):
-            indexes.append((sorted_features[2*i][0], sorted_features[2*i+1][0]))
-        return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in indexes]
+        indexes = [sorted_features[i][0] for i in range(self.max_population)]
+        return Generation(
+            index=self.generation.index,
+            genotypes=[self.generation.genotypes[i] for i in indexes],
+            population=self.max_population
+        )
 
-    def _ohv_selection(self) -> List[Iterable[Genotype]]:
+    def _ohv_reduction(self) -> Generation:
         sorted_features = sorted(
             enumerate([FeatureHelper.ohv_feature(genotype) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
         )
-        indexes = list()
-        sorted_features = sorted_features[::-1]
-        for i in range(self.crosses):
-            indexes.append((sorted_features[2*i][0], sorted_features[2*i+1][0]))
-        return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in indexes]
+        indexes = [sorted_features[i][0] for i in range(self.max_population)]
+        return Generation(
+            index=self.generation.index,
+            genotypes=[self.generation.genotypes[i] for i in indexes],
+            population=self.max_population
+        )
 
-    def _pcv_selection(self) -> List[Iterable[Genotype]]:
+    def _pcv_selection(self) -> Generation:
         pcv_matrix = np.zeros((self.generation.population, self.generation.population))
         for i in range(self.generation.population):
             for j in range(i, self.generation.population):
                 water_matrix = self.__water_matrix(self.generation.genotypes[i], self.generation.genotypes[j])
                 pcv_matrix[i, j] = np.sum(water_matrix[:, :])
-
-        indexes = np.zeros(self.crosses)
-        for i in range(self.crosses):
-            index_parent1, index_parent2 = np.unravel_index(pcv_matrix.argmax(), pcv_matrix.shape)
-            # i, j of the max
-            indexes[i] = (index_parent1, index_parent2)
-            pcv_matrix[index_parent1][index_parent2] = -1
-        return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in
-                indexes]
+        sorted_indexes = set()
+        pcv_matrix1 = pcv_matrix.copy()
+        while len(sorted_indexes) < self.max_population:
+            index_parent1, index_parent2 = np.unravel_index(pcv_matrix1.argmax(), pcv_matrix1.shape)
+            sorted_indexes.add(index_parent2)
+            sorted_indexes.add(index_parent1)
+            pcv_matrix1[index_parent1][index_parent2] = -1
+        if len(sorted_indexes) > self.max_population:
+            sorted_indexes = np.array(sorted_indexes)
+            pcv_sum = np.array(sum([pcv_matrix[i][j] for j in sorted_indexes if i != j]) for i in sorted_indexes)
+            np.delete(sorted_indexes, np.argmin(pcv_sum))
+        return Generation(
+            index=self.generation.index,
+            genotypes=[self.generation.genotypes[i] for i in sorted_indexes],
+            population=self.max_population
+        )
 
     def __water_matrix(self, genotype1: Genotype, genotype2: Genotype):
         n = self.generation.genotypes[0].matrix.shape[1]
@@ -114,8 +125,4 @@ class Selection:
             [0.5*self.freq[i], 0.5*self.freq[i], (1 - self.freq[i])**2, self.freq[i]*(1 - self.freq[i])],
             [0.5*self.freq[i], 0.5*self.freq[i], (1 - self.freq[i])**2, self.freq[i]*(1 - self.freq[i])]
         ])
-
-    @classmethod
-    def selection_implemented(cls, selection: str):
-        return True if f"_{selection}_selection" in dir(cls) else False
 
