@@ -2,26 +2,31 @@ from typing import List
 import numpy as np
 from random import choices
 import sys
+import math
 
 from models import Genotype, Generation
 from selection import Selection
 from reduction import HerdReduction
+from features import FeatureHelper
 
 
 class Breed:
-    def __init__(self, parent_genotypes: np.ndarray, possibilites: List[float], population_of_progeny: int,
+    def __init__(self, parent_genotypes: np.ndarray, possibilites: List[float], population_of_progeny=1,
                  maximum_feature=None, selection: str = "gebv", max_age: int = 1, max_population: int = sys.maxsize,
-                 possibilities_for_selection: List[float] = None, crosses: int = 1, puberty_period=0):
+                 possibilities_for_selection: List[float] = None, crosses: int = 1, puberty_period=0, self_pollinated=False):
         if len(parent_genotypes.shape) != 3 or parent_genotypes.shape[1] != 2 or any(_ <= 0 for _ in parent_genotypes.shape):
-            raise AttributeError("Массив генотипов особей задан неверно! Размерность должна быть (2 x 2 x N)")
+            raise AttributeError("Массив генотипов особей задан неверно! Размерность должна быть (N x 2 x L)")
         if max_age <= 0:
             raise AttributeError("Максимальный возраст сущности должен быть >= 1")
         if not Selection.selection_implemented(selection):
             raise NotImplementedError(f"Селекция {selection} не реализована!")
-        if len(parent_genotypes) // 2 < crosses:
-            raise AttributeError("Число скрещиваний не должно превышать количество родительских особей")
+        if math.factorial(len(parent_genotypes)) / (
+                2 * math.factorial(len(parent_genotypes) - 2)) // 2 < crosses:
+            raise AttributeError("Число скрещиваний не должно превышать количество комбинаций родительских особей")
         if max_age <= puberty_period:
             raise AttributeError("Внимание! Ваша особь умирает прежде, чем начинает размножаться!")
+        if str == "ie312" and population_of_progeny != 1:
+            raise AttributeError("Стратегия IE312 имеет заданное количество производимых особей от каждого скрещивания")
 
         self.generations: List[Generation] = [Generation(
             index=0,
@@ -40,6 +45,7 @@ class Breed:
         self.possibilities_for_selection = possibilities_for_selection
         self.crosses = crosses
         self.puberty_period = puberty_period
+        self.self_pollinated = self_pollinated
 
     def evaluate(self, max_generations: int = None):
         current_generation_number = 0
@@ -70,7 +76,8 @@ class Breed:
 
     def get_child_generation(self, parent_generation: Generation, max_generations: int):
         if parent_generation.genotypes:
-            selection = Selection(parent_generation, max_generations, possibilities=self.possibilities_for_selection, crosses=self.crosses)
+            selection = Selection(parent_generation, max_generations, possibilities=self.possibilities_for_selection,
+                                  crosses=self.crosses, self_pollinated=self.self_pollinated)
             parents = getattr(selection, f"_{self.selection}_selection")()
             childrens = []
             for pair in parents:
@@ -88,17 +95,32 @@ class Breed:
         Return children(which is amount=population_of_progeny)' genotype from parents' genotypes
         """
         children = []
-        for _ in range(self.population_of_progeny):
-            new_genotype = None
-            for genotype in (parent1, parent2):
-                if new_genotype is not None:
-                    new_genotype = np.append(
-                        new_genotype, [self.get_gamete(genotype)],
-                        axis=0
-                    )
-                else:
-                    new_genotype = np.array([self.get_gamete(genotype), ])
-            children.append(Genotype(matrix=new_genotype))
+        if self.selection == "ie312":
+            M = FeatureHelper.get_population_of_progeny_for_ie312()
+            t = self.generations[0].index
+            for _ in range(M[t]):
+                new_genotype = None
+                for genotype in (parent1, parent2):
+                    if new_genotype is not None:
+                        new_genotype = np.append(
+                            new_genotype, [self.get_gamete(genotype)],
+                            axis=0
+                        )
+                    else:
+                        new_genotype = np.array([self.get_gamete(genotype), ])
+                children.append(Genotype(matrix=new_genotype))
+        else:
+            for _ in range(self.population_of_progeny):
+                new_genotype = None
+                for genotype in (parent1, parent2):
+                    if new_genotype is not None:
+                        new_genotype = np.append(
+                            new_genotype, [self.get_gamete(genotype)],
+                            axis=0
+                        )
+                    else:
+                        new_genotype = np.array([self.get_gamete(genotype), ])
+                children.append(Genotype(matrix=new_genotype))
         return children
 
     def get_genotype_indexies(self) -> List[int]:

@@ -1,0 +1,8 @@
+population_of_progeny=20
+selection="gebv"
+max_age=1
+max_population=10000000000
+possibilities_for_selection=possibilites_for_selection
+crosses=15
+puberty_period=0
+self_pollinated=False

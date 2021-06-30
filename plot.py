@@ -70,7 +70,7 @@ class PlotHelper:
         ys_border2 = []
         for generation in generations:
             a = []
-            for i in range(10):
+            for i in range(generation.genotypes[0].matrix.shape[1]):
                 b = []
                 for genotype in generation.genotypes:
                     b.append(min([genotype.matrix[0, i], genotype.matrix[1, i]]))
@@ -85,7 +85,6 @@ class PlotHelper:
         plt.fill_between(xs, ys, ys_border2, color='white')
         plt.fill_between(xs, ys_min, ys_max, color='skyblue')
         plt.grid()
-        plt.ylim([0, 12])
         ax = plt.axes()
         ax.set(facecolor='grey')
         plt.show()

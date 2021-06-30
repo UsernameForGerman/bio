@@ -64,3 +64,8 @@ class FeatureHelper:
             _feature_function = getattr(cls, f"{approach}_feature")
 
         return _feature_function
+
+    @classmethod
+    def get_population_of_progeny_for_ie312(cls):
+        return [14, 16, 18, 21, 25, 31, 39, 52, 79, 160] # according to the model
+

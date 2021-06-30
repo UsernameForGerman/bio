@@ -11,7 +11,7 @@ from features import FeatureHelper
 
 class Selection:
     def __init__(self, generation: Generation, max_generations: int, selection: str = "gebv", possibilities: List[float] = None,
-                 crosses: int = 1):
+                 crosses: int = 1, self_pollinated=False):
         if selection == "pcv" and not possibilities:
             raise AttributeError("Не передан список вероятностей")
         self.generation = generation
@@ -19,11 +19,12 @@ class Selection:
         self.freq = possibilities
         self.crosses = crosses
         self.max_generations = max_generations
+        self.self_pollinated = self_pollinated
 
     def select(self) -> Iterable[Genotype]:
         return getattr(self, f"_{self.selection}_selection")(self.generation)
     
-    def _ie534_selection(self, crosses: int = 1) -> List[Iterable[Genotype]]:
+    def _ie534_selection(self) -> List[Iterable[Genotype]]:
         sorted_features = sorted(
             enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
@@ -35,11 +36,18 @@ class Selection:
         len_best_part_parents = len(best_part_parents)
         parent_matrix = np.zeros((len_best_part_parents, len_best_part_parents))
         for i in range(len_best_part_parents):
-            for j in range(i): #excluding crossing with myself
-                parent_matrix[i, j] = np.sum(
-                    np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
-                )  # the number of locus where at least the one in pair have a desirable allele
-                # * -  unpacking in arguments
+            if self.self_pollinated == False:
+                for j in range(i): #excluding crossing with myself
+                    parent_matrix[i, j] = np.sum(
+                        np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
+                    )  # the number of locus where at least the one in pair have a desirable allele
+                    # * -  unpacking in arguments
+            # else:
+            #     for j in range(i+1): #excluding crossing with myself
+            #         parent_matrix[i, j] = np.sum(
+            #             np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
+            #         )  # the number of locus where at least the one in pair have a desirable allele
+            #         # * -  unpacking in arguments
         t = self.generation.index + 1
         K = 6 * (self.max_generations - t) # according to the model
         indexes = np.zeros(K)
@@ -49,6 +57,20 @@ class Selection:
             indexes[i] = (index_parent1, index_parent2)
             parent_matrix[index_parent1, index_parent2] = -1
         return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in indexes]
+
+    def _ie312_selection(self) -> List[Iterable[Genotype]]:
+        sorted_features = sorted(
+            enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
+            key=lambda value: value[1],
+            reverse=True
+        )  # sorts by gebv: integer
+        t = self.generation.index + 1
+        K = 2 * (self.max_generations - t)
+        indexes = np.zeros(K)
+        for i in range(K):
+            indexes[i] = (sorted_features[i+1][0], sorted_features[t+8+i])
+        return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in indexes]
+
 
     def _gebv_selection(self) -> List[Iterable[Genotype]]:
         sorted_features = sorted(
@@ -131,7 +153,7 @@ class Selection:
         return True if f"_{selection}_selection" in dir(cls) else False
 
     def crosses_expansion(self, sorted_features) -> tuple:
-        difference = self.crosses - len(sorted_features)
+        difference = self.crosses - len(sorted_features) // 2
         n = 2
         while math.factorial(n) / (
                 2 * math.factorial(n - 2)) < difference:  # we select the required number of additional combinations
