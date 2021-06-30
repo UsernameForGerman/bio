@@ -6,14 +6,14 @@ from utils import filter_generation_by_index
 
 
 class FeatureHelper:
-    @classmethod
-    def get_feature(cls, approach="gebv"):
-        if approach == "gebv":
-            return getattr(cls, "gebv_feature")
+    # @classmethod
+    # def get_feature(cls, approach="gebv"):
+    #     if approach == "gebv":
+    #         return getattr(cls, "gebv_feature")
 
     @classmethod
-    def gebv_feature(cls, genotype: Genotype):
-        return np.sum(genotype.matrix)
+    def gebv_feature(cls, genotype: Genotype, possibilities=None):
+        return np.sum(genotype.matrix.dot(possibilities))
 
     @classmethod
     def ohv_feature(cls, genotype: Genotype):
