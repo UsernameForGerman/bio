@@ -23,14 +23,17 @@ class HerdReduction:
             reverse=True
         )  # sorts by gebv: integer
         parents = np.array(self.generation.genotypes)
+        len_parents = len(parents)
+        '''
         best_part_parents = parents[[value[0] for value in sorted_features[:math.ceil(len(sorted_features) * 0.05)]]]
         # choose fix number (len(self.generation.genotypes) * 0.05) of parents with the highest gebv
         len_best_part_parents = len(best_part_parents)
-        parent_matrix = np.zeros((len_best_part_parents, len_best_part_parents))
-        for i in range(len_best_part_parents):
-            for j in range(len_best_part_parents):
+        '''
+        parent_matrix = np.zeros((len_parents, len_parents))
+        for i in range(len_parents):
+            for j in range(len_parents):
                 parent_matrix[i, j] = np.sum(
-                    np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
+                    np.maximum(*np.maximum(parents[i].matrix, parents[j].matrix))
                 )  # the number of locus where at least the one in pair have a desirable allele
                 # * -  unpacking in arguments
         sorted_indexes = set()
@@ -39,10 +42,10 @@ class HerdReduction:
             index_parent1, index_parent2 = np.unravel_index(parent_matrix1.argmax(), parent_matrix1.shape)
             sorted_indexes.add(index_parent2)
             sorted_indexes.add(index_parent1)
-            parent_matrix1[index_parent1][index_parent2] = -1
+            parent_matrix1[index_parent1, index_parent2] = -1
         if len(sorted_indexes) > self.max_population:
             sorted_indexes = np.array(sorted_indexes)
-            v534 = np.array(sum([parent_matrix[i][j] for j in sorted_indexes if i != j]) for i in sorted_indexes)
+            v534 = np.array(sum([parent_matrix[i, j] for j in sorted_indexes if i != j]) for i in sorted_indexes)
             np.delete(sorted_indexes, np.argmin(v534))
         return Generation(
             index=self.generation.index,
@@ -76,6 +79,8 @@ class HerdReduction:
         )
 
     def _pcv_selection(self) -> Generation:
+
+        '''
         pcv_matrix = np.zeros((self.generation.population, self.generation.population))
         for i in range(self.generation.population):
             for j in range(i, self.generation.population):
@@ -97,6 +102,11 @@ class HerdReduction:
             genotypes=[self.generation.genotypes[i] for i in sorted_indexes],
             population=self.max_population
         )
+        '''
+
+        raise NotImplementedError('PCV is not implemented')
+
+
 
     def __water_matrix(self, genotype1: Genotype, genotype2: Genotype):
         n = self.generation.genotypes[0].matrix.shape[1]

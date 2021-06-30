@@ -6,10 +6,10 @@ from utils import filter_generation_by_index
 
 
 class FeatureHelper:
-    @classmethod
-    def get_feature(cls, approach="gebv"):
-        if approach == "gebv":
-            return getattr(cls, "gebv_feature")
+    # @classmethod
+    # def get_feature(cls, approach="gebv"):
+    #     if approach == "gebv":
+    #         return getattr(cls, "gebv_feature")
 
     @classmethod
     def gebv_feature(cls, genotype: Genotype, possibilities=None):
