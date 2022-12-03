@@ -26,7 +26,7 @@ class Selection:
     
     def _ie534_selection(self) -> List[Iterable[Genotype]]:
         sorted_features = sorted(
-            enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
+            enumerate([FeatureHelper.gebv_feature(genotype, self.freq) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
             reverse=True
         )  # sorts by gebv: integer
@@ -36,10 +36,10 @@ class Selection:
         len_best_part_parents = len(best_part_parents)
         parent_matrix = np.zeros((len_best_part_parents, len_best_part_parents))
         for i in range(len_best_part_parents):
-            if self.self_pollinated == False:
-                for j in range(i): #excluding crossing with myself
-                    parent_matrix[i, j] = np.sum(
-                        np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
+            #if self.self_pollinated == False:
+            for j in range(len_best_part_parents): #excluding crossing with myself
+                parent_matrix[i, j] = np.sum(
+                    np.maximum(*np.maximum(best_part_parents[i].matrix, best_part_parents[j].matrix))
                     )  # the number of locus where at least the one in pair have a desirable allele
                     # * -  unpacking in arguments
             # else:
@@ -50,7 +50,7 @@ class Selection:
             #         # * -  unpacking in arguments
         t = self.generation.index + 1
         K = 6 * (self.max_generations - t) # according to the model
-        indexes = np.zeros(K)
+        indexes = [None for i in range(K)]
         for i in range(K):
             index_parent1, index_parent2 = np.unravel_index(parent_matrix.argmax(), parent_matrix.shape)
             # i, j of the max
@@ -71,6 +71,15 @@ class Selection:
             indexes[i] = (sorted_features[i+1][0], sorted_features[t+8+i])
         return [(self.generation.genotypes[parent1], self.generation.genotypes[parent2]) for parent1, parent2 in indexes]
 
+    def _ie634_selection(self) -> List[Iterable[Genotype]]:
+        sorted_features = sorted(
+            enumerate([FeatureHelper.gebv_feature(genotype) for genotype in self.generation.genotypes]),
+            key=lambda value: value[1],
+            reverse=True
+        )  # sorts by gebv: integer
+        best_parents = sorted_features[:100] # accordint to the model
+
+
 
     def _gebv_selection(self) -> List[Iterable[Genotype]]:
         sorted_features = sorted(
@@ -90,6 +99,7 @@ class Selection:
             enumerate([FeatureHelper.ohv_feature(genotype) for genotype in self.generation.genotypes]),
             key=lambda value: value[1],
         )
+        sorted_features = sorted_features[::-1]
         indexes = list()
         if len(sorted_features) // 2 < self.crosses:
             sorted_features = self.crosses_expansion(sorted_features)

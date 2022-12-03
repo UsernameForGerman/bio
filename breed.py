@@ -67,7 +67,8 @@ class Breed:
                 child_generation.population = self.max_population
             self.generations.append(child_generation)
 
-            if max_generations and current_generation_number == max_generations:
+            if max_generations and current_generation_number == max_generations-2:
+                print(genotype.matrix for genotype in self.generations[-1].genotypes)
                 return current_generation_number
             current_generation_number += 1
 

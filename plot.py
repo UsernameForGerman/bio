@@ -88,6 +88,7 @@ class PlotHelper:
         ax = plt.axes()
         ax.set(facecolor='grey')
         plt.show()
+        plt.savefig()
 
     @classmethod
     def desirable_alleles_percent(cls, generations: List[Generation], selection):
